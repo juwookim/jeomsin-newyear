@@ -189,6 +189,46 @@ footer small{display:block; margin-top:30px; color:var(--muted); font-size:12.5p
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
 
+.fortune-form{margin-top:10px}
+.fields{display:grid; grid-template-columns:repeat(2,1fr); gap:22px 34px}
+.field{display:grid; gap:8px}
+.field>span{font-family:var(--label); font-size:12px; letter-spacing:.38em; color:var(--gold)}
+.fortune-form input[type=text],.fortune-form input[type=date],.fortune-form input[type=time]{
+  width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--gold-dim); background:#0d0b0c;
+  color:var(--ink); font:inherit; color-scheme:dark;
+}
+.fortune-form input:focus-visible{outline:none; border-color:var(--green); box-shadow:0 0 0 3px rgba(114,217,106,.18)}
+.fortune-form input[type=time]:disabled{opacity:.35}
+.seg{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+.seg input[type=time]{flex:1; min-width:130px}
+.seg label{position:relative; cursor:pointer}
+.seg label input{position:absolute; opacity:0; inset:0; cursor:pointer}
+.seg label b{display:block; font-weight:400; padding:10px 18px; border-radius:999px; border:1px solid var(--gold-dim); color:var(--muted); transition:.2s}
+.seg label input:checked+b{border-color:var(--pink); color:var(--ink); background:rgba(240,102,140,.12)}
+.seg label input:focus-visible+b{box-shadow:0 0 0 3px rgba(240,102,140,.3)}
+.seg label input:disabled+b{opacity:.3; cursor:not-allowed}
+.draw{display:block; margin:34px auto 6px; padding:16px 46px; border-radius:999px; cursor:pointer;
+  font-family:var(--kr-display); font-size:20px; letter-spacing:.3em; color:#0b090a;
+  background:linear-gradient(90deg,var(--pink),var(--green)); border:0; box-shadow:0 10px 34px -10px rgba(114,217,106,.6);
+  transition:transform .2s}
+.draw:hover{transform:translateY(-2px)}
+.form-error{text-align:center; color:var(--pink); margin-bottom:22px}
+.loading{position:fixed; inset:0; z-index:90; display:grid; place-content:center; justify-items:center; gap:10px;
+  background:rgba(7,6,7,.92); text-align:center}
+.loading[hidden]{display:none}
+.loading .emblem{animation:float 2.4s ease-in-out infinite}
+.loading p{font-family:var(--kr-display); font-size:26px; letter-spacing:.3em}
+.loading small{color:var(--muted)}
+@keyframes float{50%{transform:translateY(-10px)}}
+.change{margin-top:22px}
+.change summary{list-style:none; display:inline-block; cursor:pointer; padding:9px 24px; border-radius:999px;
+  border:1px solid var(--pink); color:var(--pink); font-family:var(--kr-display); letter-spacing:.2em; transition:.2s}
+.change summary::-webkit-details-marker{display:none}
+.change summary:hover,.change summary:focus-visible{outline:none; background:rgba(240,102,140,.12); color:var(--ink)}
+.change[open] summary{background:rgba(240,102,140,.12); color:var(--ink)}
+.change .fortune-form{text-align:left; margin-top:46px}
+@media (max-width:760px){.fields{grid-template-columns:1fr}}
+
 </style>
 </head>
 <body>
@@ -215,7 +255,38 @@ footer small{display:block; margin-top:30px; color:var(--muted); font-size:12.5p
       <div class="green"><strong>붉은 말의 해</strong><small>YEAR OF THE RED HORSE</small></div>
     </div>
     <p class="hero-who"><span><b>홍길동</b></span><span>1999.05.21 양력</span><span>시간 모름</span><span>남</span></p>
+    <details class="change"><summary>사주 변경 ✦</summary>
+  <form class="frame fortune-form" method="post" action="#" data-api="https://jeomsin-fortune.juwookim.workers.dev/fortune">
+    <span class="frame-title green">사주 정보 변경</span>
     
+    <div class="fields">
+      <label class="field"><span>이름</span><input type="text" name="name" required maxlength="20" placeholder="홍길동" value="홍길동"></label>
+      <label class="field"><span>생년월일</span><input type="date" name="birth" required min="1900-01-01" max="2099-12-31" value="1999-05-21"></label>
+      <div class="field"><span>양력 · 음력</span><div class="seg">
+        <label><input type="radio" name="calendar" value="solar" checked><b>양력</b></label>
+        <label><input type="radio" name="calendar" value="lunar"><b>음력</b></label>
+        <label><input type="checkbox" name="leap" value="1"><b>윤달</b></label></div></div>
+      <div class="field"><span>태어난 시간</span><div class="seg">
+        <input type="time" name="time" value="">
+        <label><input type="checkbox" name="unknown" value="1" checked><b>모름</b></label></div></div>
+      <div class="field"><span>성별</span><div class="seg">
+        <label><input type="radio" name="gender" value="male" checked><b>남</b></label>
+        <label><input type="radio" name="gender" value="female"><b>여</b></label></div></div>
+      <div class="field"><span>운세 연도</span><div class="seg"><label><input type="radio" name="year" value="2026" checked><b>2026년</b></label></div></div>
+    </div>
+    <button class="draw" type="submit">카드 뽑기 ✦</button>
+    <span class="frame-foot">DRAW A NEW CARD</span>
+  </form>
+  <div class="loading" hidden><svg class="emblem" viewBox="0 0 100 130" aria-hidden="true">
+      <path class="line" d="M14 124V54a36 36 0 0 1 72 0v70z"/>
+      <path class="line" d="M22 124V56a28 28 0 0 1 56 0v68"/>
+      <path class="line" d="M36 124v-10h14v-10h14v-10h14"/>
+      <path class="s1 twinkle" d="M40 42c.5 4 2 5.5 6 6-4 .5-5.5 2-6 6-.5-4-2-5.5-6-6 4-.5 5.5-2 6-6z"/>
+      <path class="s2 twinkle" d="M62 58c.4 3 1.5 4 4.5 4.5-3 .4-4.1 1.5-4.5 4.5-.4-3-1.5-4.1-4.5-4.5 3-.5 4.1-1.5 4.5-4.5z"/>
+      <circle class="s2 twinkle" cx="56" cy="34" r="1.6"/><circle class="s1 twinkle" cx="34" cy="68" r="1.4"/>
+      <circle class="s1" cx="66" cy="80" r="1.2"/><circle class="s2" cx="44" cy="86" r="1.2"/>
+    </svg><p>카드를 섞는 중</p><small>점신에서 운세를 가져오고 있어요 · 30초 정도 걸려요</small></div>
+  </details>
   </section>
 
   <div class="band"></div>
@@ -253,6 +324,7 @@ footer small{display:block; margin-top:30px; color:var(--muted); font-size:12.5p
   </div>
   <small>운세 데이터 출처: 점신(jeomsin.co.kr) · Firecrawl로 수집 · 개인 열람용</small>
 </footer>
-
+<script src="fortune-data.js"></script>
+<script src="fortune.js"></script>
 </body>
 </html>

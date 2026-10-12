@@ -13,6 +13,18 @@ import pathlib
 import re
 import sys
 
+HERE = pathlib.Path(__file__).resolve().parent
+SITE_CONFIG = HERE / "site_config.json"  # {"api_url": "https://...workers.dev/fortune"}
+
+
+def load_api():
+    """사이트 입력 폼이 보낼 Cloudflare Worker 주소 (없으면 폼 없이 만든다)."""
+    try:
+        return json.loads(SITE_CONFIG.read_text(encoding="utf-8")).get("api_url", "").strip()
+    except FileNotFoundError:
+        return ""
+
+
 # 데이터 키 -> (영문 라벨, 카드 문양, 강조색)
 CHAPTERS = [
     ("Saju", "NATAL CHART", "eye", "gold"),
@@ -170,12 +182,14 @@ def build(src):
     """결과 JSON -> 정적 HTML 파일 (입력 폼 없음)."""
     doc = json.loads(pathlib.Path(src).read_text(encoding="utf-8"))
     out = pathlib.Path(src).with_suffix(".html")
-    out.write_text(render_page(doc), encoding="utf-8")
+    api = load_api()
+    out.write_text(render_page(doc, form=bool(api), api=api), encoding="utf-8")
     return out
 
 
-def render_page(doc, form=False):
-    """결과 페이지 HTML. form=True 면 '사주 변경' 폼을 넣는다 (app.py 에서 사용)."""
+def render_page(doc, form=False, api=""):
+    """결과 페이지 HTML. form=True 면 '사주 변경' 폼을 넣는다.
+    api 가 없으면 app.py 로 POST, 있으면 브라우저가 그 Worker 를 호출한다 (web/fortune.js)."""
     p, year, result = doc["profile"], int(doc["year"]), doc["result"]
     ganji = STEMS[(year - 4) % 10] + BRANCHES[(year - 4) % 12]
     color, animal = STEM_COLORS[(year - 4) % 10], (year - 4) % 12
@@ -203,9 +217,9 @@ def render_page(doc, form=False):
         "{{DECK}}": render_deck(result), "{{CHAPTERS}}": chapters,
         "{{CHANGE}}": (
             '<details class="change"><summary>사주 변경 ✦</summary>'
-            f'{render_form(values=profile_values(doc), band=False, title="사주 정보 변경")}</details>') if form else "",
+            f'{render_form(values=profile_values(doc), band=False, title="사주 정보 변경", api=api)}</details>') if form else "",
         "/*{{FORM_CSS}}*/": FORM_CSS if form else "",
-        "{{FORM_JS}}": FORM_JS if form else "",
+        "{{FORM_JS}}": (API_SCRIPTS if api else FORM_JS) if form else "",
     }.items():
         page = page.replace(k, v)
     return page
@@ -514,6 +528,8 @@ FORM_CSS = """
 @media (max-width:760px){.fields{grid-template-columns:1fr}}
 """
 
+API_SCRIPTS = '<script src="fortune-data.js"></script>\n<script src="fortune.js"></script>'
+
 FORM_JS = """
 <script>
 (function(){
@@ -534,14 +550,15 @@ FORM_JS = """
 """
 
 
-def render_form(error="", values=None, band=True, title="새 카드 뽑기"):
+def render_form(error="", values=None, band=True, title="새 카드 뽑기", api=""):
     v = {k: esc(x) for k, x in (values or {}).items()}
     chk = lambda cond: " checked" if cond else ""
     lunar, female = v.get("calendar") == "lunar", v.get("gender") == "female"
     year = v.get("year") or str(datetime.date.today().year)
     err = f'<p class="form-error">{esc(error)}</p>' if error else ""
+    target = f'action="#" data-api="{esc(api)}"' if api else 'action="/make"'
     return f"""
-  <form class="frame fortune-form" method="post" action="/make">
+  <form class="frame fortune-form" method="post" {target}>
     <span class="frame-title green">{title}</span>
     {err}
     <div class="fields">
@@ -569,11 +586,27 @@ def render_form(error="", values=None, band=True, title="새 카드 뽑기"):
 def build_index(out_dir):
     """out_dir 안의 모든 결과 JSON을 카드로 모은 index.html 생성 (입력 폼 없는 정적 버전)."""
     out = pathlib.Path(out_dir) / "index.html"
-    out.write_text(render_index(out_dir), encoding="utf-8")
+    api = load_api()
+    out.write_text(render_index(out_dir, form=bool(api), api=api), encoding="utf-8")
+    write_assets(out_dir)
     return out
 
 
-def render_index(out_dir, form=False, error="", values=None):
+def write_assets(out_dir):
+    """브라우저 렌더러(web/fortune.js)와 그것이 쓰는 템플릿·상수(fortune-data.js)를 out_dir 에 쓴다."""
+    out_dir = pathlib.Path(out_dir)
+    data = {
+        "TEMPLATE": TEMPLATE, "FORM_CSS": FORM_CSS, "EMBLEM": EMBLEM, "API_SCRIPTS": API_SCRIPTS,
+        "CHAPTERS": CHAPTERS, "ROMAN": ROMAN, "SUITS": SUITS,
+        "STEMS": STEMS, "STEM_COLORS": STEM_COLORS, "BRANCHES": BRANCHES,
+        "ANIMALS": ANIMALS, "ANIMALS_EN": ANIMALS_EN, "COLORS_EN": COLORS_EN,
+    }
+    (out_dir / "fortune-data.js").write_text(
+        "window.FORTUNE_DATA = " + json.dumps(data, ensure_ascii=False) + ";\n", encoding="utf-8")
+    (out_dir / "fortune.js").write_text((HERE / "web" / "fortune.js").read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def render_index(out_dir, form=False, error="", values=None, api=""):
     """목록 페이지 HTML. form=True 면 새 사람 입력 폼을 함께 넣는다 (app.py 에서 사용)."""
     out_dir = pathlib.Path(out_dir)
     files = sorted(out_dir.glob("newyear_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
@@ -583,7 +616,7 @@ def render_index(out_dir, form=False, error="", values=None):
         p, year = doc["profile"], int(doc["year"])
         years.add(year)
         ganji = STEMS[(year - 4) % 10] + BRANCHES[(year - 4) % 12]
-        total = doc["result"].get("Total", {}).get("menu2", {}).get("category1", {})
+        total = (doc["result"].get("Total") or {}).get("menu2", {}).get("category1", {})
         best = total.get("depth2", {}).get("img", "")
         care = total.get("depth3", {}).get("img", "")
         icon, accent = [("sparkle", "pink"), ("diamond", "green"), ("heart", "pink"), ("club", "green")][i % 4]
@@ -625,7 +658,7 @@ def render_index(out_dir, form=False, error="", values=None):
     </div>
   </section>
   <div class="band"></div>
-  {render_form(error, values) if form else ""}
+  {render_form(error, values, api=api) if form else ""}
   <div class="deck-head" id="deck">
     <h3>운세 카드 덱</h3>
     <p>CHOOSE YOUR CARD</p>
@@ -633,7 +666,7 @@ def render_index(out_dir, form=False, error="", values=None):
   <nav class="deck">{"".join(cards)}</nav>
 </main>
 {FOOTER}
-{FORM_JS if form else ""}
+{(API_SCRIPTS if api else FORM_JS) if form else ""}
 </body>
 </html>
 """
